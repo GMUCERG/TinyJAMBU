@@ -317,8 +317,11 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
                 bdi_ready      <= '1';
                 next_state  <= TAG_D;
                 if (bdo /= bdi) then
-                    auth_failed_en  <= '1';
-                    auth_failed     <= '1';
+                    auth_failed_en   <= '1';
+                    auth_failed_next <= '1';
+                else
+                    auth_failed_en   <= '1';
+                    auth_failed_next <= '0';
                 end if;
             end if;
         when TAG_D =>
