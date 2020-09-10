@@ -153,6 +153,8 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         bdo_sel             <= '0';
         msg_auth_valid      <= '0';
         msg_auth            <= '0';
+        auth_failed_en      <= '0';
+        auth_failed_next    <= '0';
         bdo_type            <= (others => '0');
         bdo_valid_bytes     <= (others => '0');
         s_sel               <= (others => '1');
