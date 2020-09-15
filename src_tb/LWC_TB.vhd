@@ -30,7 +30,7 @@ entity LWC_TB IS
     generic (
         --! External bus: supported values are 8, 16 and 32 bits
         G_MAX_FAILURES      : integer := 100;
-        G_TEST_MODE         : integer := 4;
+        G_TEST_MODE         : integer := 0;
         G_TEST_IPSTALL      : integer := 10;
         G_TEST_ISSTALL      : integer := 100;
         G_TEST_OSTALL       : integer := 40;
@@ -772,9 +772,7 @@ begin
                         if ((seg_type = HDR_PT or seg_type = HDR_TAG or seg_type = HDR_HASH_MSG) and seg_last = '1')then
                             wait until falling_edge(clk);
                             stall_msg <= '1'; -- last segment wait until cipher is done
-                            --report "---------Stalling seg_count else" severity note;
                             if latency_done /= '1' and start_latency_timer = '1' then
-                                --report "---------Latency done != 1" severity note;
                                 wait until latency_done = '1';
                                 if (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD)) then
                                     stall_msg <= '0';
@@ -783,12 +781,10 @@ begin
                                     exit;
                                 end if;
                             end if;
-                            --report "---------Outside latency done" severity note;
                             start_latency_timer <= '0';
                             if (do_last /= '1' or (do /= SUCCESS_WORD and do /= FAILURE_WORD)) then
                                 wait until (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD));
                             end if;
-                            --wait until (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD));
                             stall_msg <= '0';
                             exec_time := clk_cycle_counter-msg_start_time;
                             msg_idx := msg_idx + 1;
