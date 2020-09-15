@@ -2,9 +2,7 @@
 
 Notation:
  
-Na, Nm, Nc, Nh : the number of complete blocks of associated data, plaintext, ciphertext, and hash message, respectively
-Ina, Inm, Inc, Inh : binary variables equal to 1 if the last block of the respective data type is incomplete, and 0 otherwise
-Bla, Blm, Blc, Blh : the number of bytes in the incomplete block of associated data, plaintext, ciphertext, and hash message, respectively.
+Na, Nm, Nc : the number of all blocks of associated data, plaintext, and ciphertext, respectively
  
 v1: TinyJambu-128 32-bit concurrent NLFSR
  
