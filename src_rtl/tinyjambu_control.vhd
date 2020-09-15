@@ -106,8 +106,7 @@ signal npub             : unsigned (1 downto 0);
 signal next_npub        : unsigned (1 downto 0);
 
 signal auth_failed, auth_failed_next: std_logic;
-
-signal local_decrypt, local_decrypt_next    : std_logic;
+signal auth_failed_en               : std_logic;
 begin
 
 key_index               <= std_logic_vector (key_count(1 downto 0));
@@ -120,15 +119,17 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
                 npub        <= (others => '0');
                 key_count   <= (others => '0');
                 cycles      <= (others => '0');
-                local_decrypt <= '0';
+                
                 auth_failed <= '0';
             else
                 state       <= next_state;
                 npub        <= next_npub;
                 key_count   <= next_key_count;
                 cycles      <= next_cycles;
-                local_decrypt <= local_decrypt_next;
-                auth_failed <= auth_failed_next;
+                
+                if (auth_failed_en = '1') then
+                    auth_failed <= auth_failed_next;
+                end if;
             end if;
         end if;
     end process;
@@ -152,9 +153,8 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         bdo_sel             <= '0';
         msg_auth_valid      <= '0';
         msg_auth            <= '0';
-        auth_failed_next    <= auth_failed;
-        local_decrypt_next  <= local_decrypt;
-
+        auth_failed_en      <= '0';
+        auth_failed_next    <= '0';
         bdo_type            <= (others => '0');
         bdo_valid_bytes     <= (others => '0');
         s_sel               <= (others => '1');
@@ -173,12 +173,6 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
             nlfsr_reset     <= '1';
             if (key_valid = '1' and key_update = '1') then
                 next_state  <= LOAD_KEY;
-            end if;
-            if (bdi_valid = '1') then
-                next_state  <= KEY_INIT;
-            end if;
-            if (decrypt_in = '1') then
-                local_decrypt_next <= '1';
             end if;
         when LOAD_KEY =>
             key_ready       <= '1';
@@ -283,7 +277,7 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
                 bdo_valid   <= '1';
                 bdo_valid_bytes <= bdi_valid_bytes;
                 nlfsr_load  <= '1'; 
-                if (local_decrypt = '1') then
+                if (decrypt_in = '1') then
                     bdo_type    <= HDR_PT;
                     decrypt_out <= '1';
                 else
@@ -321,12 +315,14 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
             if (bdo_ready = '1') then
                 next_state      <= TAG_D;
             end if;
-            if (local_decrypt = '1') then
+            if (decrypt_in = '1') then
                 bdi_ready      <= '1';
                 next_state  <= TAG_D;
                 if (bdo /= bdi) then
+                    auth_failed_en   <= '1';
                     auth_failed_next <= '1';
                 else
+                    auth_failed_en   <= '1';
                     auth_failed_next <= '0';
                 end if;
             end if;
@@ -350,7 +346,7 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
             if (bdo_ready   <= '1') then
                 next_state      <= IDLE;
             end if;
-            if (local_decrypt = '1') then
+            if (decrypt_in = '1') then
                 msg_auth_valid <= '1';
                 bdi_ready      <= '1';
                 if (bdo = bdi) then
