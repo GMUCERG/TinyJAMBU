@@ -35,11 +35,15 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use work.NIST_LWAPI_pkg.all;
-use work.Design_pkg.all;
+use work.design_pkg.all;
 
 entity PostProcessor is
+	generic (
+		G_W          : integer;
+		G_ASYNC_RSTN : boolean	
+	);
 
-    Port (
+    port (
             clk             : in  std_logic;
             rst             : in  std_logic;
             --! Crypto Core ====================================================
@@ -47,17 +51,17 @@ entity PostProcessor is
             bdo_valid       : in  std_logic;
             bdo_ready       : out std_logic;
             end_of_block    : in  std_logic;
-            bdo_type        : in  std_logic_vector(3 downto 0); -- not used atm
+--            bdo_type        : in  std_logic_vector(3 downto 0); -- not used atm
             bdo_valid_bytes : in  std_logic_vector(CCWdiv8-1 downto 0);
             msg_auth        : in  std_logic;
             msg_auth_ready  : out std_logic;
             msg_auth_valid  : in  std_logic;
             ---! Header FIFO ===================================================
-            cmd             : in  std_logic_vector(W-1 downto 0);
+            cmd             : in  std_logic_vector(G_W-1 downto 0);
             cmd_valid       : in  std_logic;
             cmd_ready       : out std_logic;
             --! Data Output (do) ===============================================
-            do_data         : out std_logic_vector(W-1 downto 0);
+            do_data         : out std_logic_vector(G_W-1 downto 0);
             do_valid        : out std_logic;
             do_last         : out std_logic;
             do_ready        : in  std_logic
@@ -68,7 +72,7 @@ end PostProcessor;
 architecture PostProcessor of PostProcessor is
 
     --Signals
-    signal do_data_internal     : std_logic_vector(W-1 downto 0);
+    signal do_data_internal     : std_logic_vector(G_W-1 downto 0);
     signal do_valid_internal    : std_logic;
     signal bdo_cleared          : std_logic_vector(CCW-1 downto 0);
     signal len_SegLenCnt        : std_logic;
@@ -83,13 +87,17 @@ architecture PostProcessor of PostProcessor is
     signal eot, nx_eot          : std_logic;
 
     --Aliases
-    alias cmd_opcode            : std_logic_vector( 3 downto 0) is cmd(W-1 downto W-4);
-    alias cmd_seg_length        : std_logic_vector((W/2)-1 downto 0) is cmd((W/2)-1 downto  0);
+    alias cmd_opcode            : std_logic_vector( 3 downto 0) is cmd(G_W-1 downto G_W-4);
+    alias cmd_seg_length        : std_logic_vector((G_W/2)-1 downto 0) is cmd((G_W/2)-1 downto  0);
 
     --Constants
     constant HASHdiv8           : integer := HASH_VALUE_SIZE/8;
     constant TAGdiv8            : integer := TAG_SIZE/8;
-    constant zero_data          : std_logic_vector(W-1 downto 0):=(others=>'0');
+    constant zero_data          : std_logic_vector(G_W-1 downto 0) := (others=>'0');
+    
+	--! Default values for do_data bus
+    --! to avoid leaking intermeadiate values if do_valid = '0'.
+    constant do_data_defaults   : std_logic_vector(G_W-1 downto 0) := (others => '0');
 
     --State types for different I/O sizes
     --! State for W=SW=32
@@ -132,18 +140,18 @@ begin
     SegLen: entity work.StepDownCountLd(StepDownCountLd)
                 generic map(
                         N       =>  16,
-                        step    =>  Wdiv8
-                            )
+                        step    =>  G_W/8
+                )
                 port map
                         (
-                        clk     =>  clk ,
-                        len     =>  len_SegLenCnt,
-                        load    =>  load_SegLenCnt,
-                        ena     =>  en_SegLenCnt,
-                        count   =>  dout_SegLenCnt
+                        clk     => clk,
+                        len     => len_SegLenCnt,
+                        ena     => en_SegLenCnt,
+                        load    => load_SegLenCnt,
+                        count   => dout_SegLenCnt
                     );
 
-    last_flit_of_segment <= '1' when (to_integer(to_01(unsigned(dout_SegLenCnt))) <= Wdiv8) else '0';
+    last_flit_of_segment <= '1' when (to_integer(to_01(unsigned(dout_SegLenCnt))) <= G_W/8) else '0';
 
     --! Registers
     -- state register depends on W and is set in the corresponding if generate
@@ -161,7 +169,7 @@ begin
    --! 32 bit specific FSM -------------------------------------------------------------------------------
    -- ====================================================================================================
 
-FSM_32BIT: if (W=32) generate
+FSM_32BIT: if (G_W=32) generate
 
     --! 32 Bit specific declarations
     alias do_data_internal_opcode   : std_logic_vector( 3 downto 0) is do_data_internal(31 downto 28);
@@ -182,25 +190,31 @@ FSM_32BIT: if (W=32) generate
 
     --! SIPO
     -- for ccw < W: a sipo is used for width conversion
-    bdoSIPO: entity work.DATA_SIPO(behavioral) port map
-        (
-            clk=> clk,
-            rst=> rst,
-            -- no need for conversion, as our last serial_in element is also the
-            -- last parallel_out element
-            end_of_input  => end_of_block,
-            -- end_of_bock should only be evaluated if bdo_valid_p = '1'
-            data_s       => bdo_cleared,
-            data_valid_s => bdo_valid,
-            data_ready_s => bdo_ready,
-
-            data_p       => bdo_p,
-            data_valid_p => bdo_valid_p,
-            data_ready_p => bdo_ready_p
-        );
+    bdoSIPO: entity work.DATA_SIPO(behavioral)
+	    generic map(
+	    		G_ASYNC_RSTN => G_ASYNC_RSTN
+	    	)
+	    port map
+	        (
+	            clk          => clk,
+	            rst          => rst,
+	            
+	            -- no need for conversion, as our last serial_in element is also the
+	            -- last parallel_out element
+	            end_of_input => end_of_block,
+	            -- end_of_bock should only be evaluated if bdo_valid_p = '1'
+	
+	            data_p       => bdo_p,
+	            data_valid_p => bdo_valid_p,
+	            data_ready_p => bdo_ready_p,
+	            
+	            data_s       => bdo_cleared,
+	            data_valid_s => bdo_valid,
+	            data_ready_s => bdo_ready
+	        );
 
     --! State register
-    GEN_proc_SYNC_RST: if (not ASYNC_RSTN) generate
+    GEN_proc_SYNC_RST: if (not G_ASYNC_RSTN) generate
         process (clk)
         begin
             if rising_edge(clk) then
@@ -212,7 +226,7 @@ FSM_32BIT: if (W=32) generate
             end if;
         end process;
     end generate GEN_proc_SYNC_RST;
-    GEN_proc_ASYNC_RSTN: if (ASYNC_RSTN) generate
+    GEN_proc_ASYNC_RSTN: if (G_ASYNC_RSTN) generate
         process (clk, rst)
         begin
             if(rst='0')  then
@@ -345,7 +359,7 @@ FSM_32BIT: if (W=32) generate
                 end if;
 
             when others=>
-                    nx_state <= pr_state;
+                nx_state <= pr_state;
         end case;
     end process;
 
@@ -473,8 +487,675 @@ FSM_32BIT: if (W=32) generate
                 do_data_internal_opcode       <= INST_SUCCESS;
                 do_data_internal(27 downto 0) <= (others=>'0');
 
+        end case;
+    end process;
+
+end generate;
+
+
+
+   -- ====================================================================================================
+   --! 16 bit specific FSM -------------------------------------------------------------------------------
+   -- ====================================================================================================
+
+FSM_16BIT: if (G_W=16) generate
+
+    --! 16 Bit specific declarations
+    signal nx_state, pr_state : t_state16;
+    signal HDR_TAG_internal     : std_logic_vector(31 downto 0);
+    signal data_seg_length      : std_logic_vector(G_W-1 downto 0);
+    signal tag_size_bytes       : std_logic_vector(16  -1 downto 0);
+    
+    begin
+
+    --! Logics
+    data_seg_length  <= cmd;
+    tag_size_bytes   <= std_logic_vector(to_unsigned(TAGdiv8, 16));
+    load_SegLenCnt   <= data_seg_length(G_W-1 downto G_W-8*(G_W/8));
+    HDR_TAG_internal <= HDR_TAG & x"300"& tag_size_bytes(15 downto 0);
+    
+    --! State register
+    GEN_proc_SYNC_RST: if (not G_ASYNC_RSTN) generate
+        process (clk)
+        begin
+            if rising_edge(clk) then
+                if(rst='1')  then
+                    pr_state <= S_INIT;
+                else
+                    pr_state <= nx_state;
+                end if;
+            end if;
+        end process;
+    end generate GEN_proc_SYNC_RST;
+    GEN_proc_ASYNC_RSTN: if (G_ASYNC_RSTN) generate
+        process (clk, rst)
+        begin
+            if(rst='0')  then
+                pr_state <= S_INIT;
+            elsif rising_edge(clk) then
+                pr_state <= nx_state;
+            end if;
+        end process;
+    end generate GEN_proc_ASYNC_RSTN;
+
+
+    --! Next state function
+    process (pr_state, bdo_valid, do_ready, end_of_block, decrypt,
+            cmd_valid, cmd, msg_auth_valid, msg_auth,  last_flit_of_segment, eot)
+
+    begin
+        case pr_state is
+
+            when S_INIT=>
+                if (cmd_valid='1') then
+                    if (cmd(G_W-1 downto G_W-4) = INST_HASH) then
+                        nx_state <= S_HDR_HASH;
+                    else
+                        nx_state <= S_HDR_MSG;
+                    end if;
+                else
+                    nx_state <= S_INIT;
+                end if;
+
+            when S_HDR_HASH =>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_HASHLEN;
+                else
+                    nx_state <= S_HDR_HASH;
+                end if;
+
+            when S_HDR_HASHLEN=>
+                if (do_ready='1') then
+                    nx_state <= S_OUT_HASH;
+                else
+                    nx_state <= S_HDR_HASHLEN;
+                end if;
+
+            when S_OUT_HASH =>
+                if (bdo_valid = '1' and do_ready = '1' and end_of_block = '1') then
+                    nx_state <= S_STATUS_SUCCESS;
+                else
+                    nx_state <= S_OUT_HASH;
+                end if;
+
+            when S_HDR_MSG=>
+                if (cmd_valid='1' and do_ready='1') then
+                    nx_state  <= S_HDR_MSGLEN;
+                else
+                    nx_state <= S_HDR_MSG;
+                end if;
+
+            when S_HDR_MSGLEN=>
+                if (cmd=zero_data and cmd_valid='1' and do_ready='1') then
+                    if (decrypt='1')then
+                        nx_state <= S_VER_TAG_IN;
+                    else
+                        nx_state <= S_HDR_TAG;
+                    end if;
+                elsif (cmd_valid='1' and do_ready='1') then
+                    nx_state <= S_OUT_MSG;
+                else
+                    nx_state <= S_HDR_MSGLEN;
+                end if;
+
+            when S_OUT_MSG =>
+                if (bdo_valid='1' and do_ready='1') then
+                    if (last_flit_of_segment='1') then
+                        if (eot = '1') then
+                            if (decrypt='1') then
+                                nx_state <= S_VER_TAG_IN;
+                            else
+                                nx_state <= S_HDR_TAG;
+                            end if;
+                        else
+                            nx_state <= S_HDR_MSG;
+                        end if;
+                    else
+                        nx_state <= S_OUT_MSG;
+                    end if;
+                else
+                    nx_state <= S_OUT_MSG;
+                end if;
+
+            --TAG
+            when S_HDR_TAG=>
+                if (do_ready='1' ) then
+                    nx_state  <= S_HDR_TAGLEN;
+                 else
+                    nx_state <= S_HDR_TAG;
+                end if;
+
+            when S_HDR_TAGLEN=>
+                if (do_ready='1') then
+                    nx_state <= S_OUT_TAG;
+                else
+                    nx_state <= S_HDR_TAGLEN;
+                end if;
+
+            when S_OUT_TAG =>
+                if (bdo_valid='1' and end_of_block='1' and do_ready='1') then
+                    nx_state <= S_STATUS_SUCCESS;
+                else
+                    nx_state <= S_OUT_TAG;
+                end if;
+
+            when  S_VER_TAG_IN=>
+                if (msg_auth_valid='1') then
+                    if (msg_auth='1') then
+                        nx_state <= S_STATUS_SUCCESS;
+                    else
+                        nx_state <= S_STATUS_FAIL;
+                    end if;
+                else
+                    nx_state <= S_VER_TAG_IN;
+                end if;
+
+            when  S_STATUS_FAIL=>
+                if (do_ready='1') then
+                    nx_state<= S_INIT;
+                else
+                    nx_state<= S_STATUS_FAIL;
+                end if;
+
+            when  S_STATUS_SUCCESS=>
+                if (do_ready='1') then
+                    nx_state<= S_INIT;
+                else
+                    nx_state<= S_STATUS_SUCCESS;
+                end if;
+
             when others=>
-                null;
+                nx_state <= S_INIT;
+        end case;
+    end process;
+
+    --! Output state function
+    process(pr_state, bdo_valid, end_of_block, msg_auth_valid, msg_auth,
+            decrypt, cmd, cmd_valid, do_ready, eot, tag_size_bytes, HDR_TAG_internal,
+            bdo_cleared)
+    begin
+        -- DEFAULT Values
+        -- external interface
+        do_last           <='0';
+        do_valid_internal <='0';
+        do_data_internal  <= (others => '-');
+        -- CryptoCore
+        bdo_ready         <='0';
+        msg_auth_ready    <='0';
+        -- Header-FIFO
+        cmd_ready         <='0';
+        -- Segment counter
+        len_SegLenCnt     <='0';
+        en_SegLenCnt      <='0';
+        --Registers
+        nx_eot            <= eot;
+        nx_decrypt        <= decrypt;
+
+        case pr_state is
+
+            when S_INIT=>
+                if (cmd_valid = '1') then
+                    nx_decrypt <= cmd(G_W-4);
+                end if;
+                cmd_ready <= '1';
+                nx_eot    <= '0';
+
+            --HASH
+            when S_HDR_HASH =>
+                do_valid_internal                <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <= HDR_HASH_VALUE;
+                do_data_internal(G_W-5 downto G_W-7) <= "001";
+                do_data_internal(G_W-8)            <= '1';
+                do_data_internal(G_W-9 downto 0)   <= (others => '0');
+
+
+            when S_HDR_HASHLEN =>
+                do_valid_internal <='1';
+                do_data_internal  <= std_logic_vector(to_unsigned(HASHdiv8, G_W));
+
+            when S_OUT_HASH =>
+                bdo_ready         <= do_ready;
+                do_valid_internal <= bdo_valid;
+                do_data_internal  <= bdo_cleared;
+
+            --MSG
+            when S_HDR_MSG =>
+                cmd_ready         <= do_ready;
+                do_valid_internal <= cmd_valid;
+                len_SegLenCnt     <= do_ready and cmd_valid;
+                nx_eot            <= cmd(G_W-7);
+
+                if (decrypt='1') then
+                    --header is msg
+                    do_data_internal(G_W-1 downto G_W-4) <= HDR_PT;
+                    do_data_internal(G_W-8)            <= '1' and cmd(G_W-7);
+                else
+                    ---header is ciphertext
+                    do_data_internal(G_W-1 downto G_W-4) <= HDR_CT;
+                    do_data_internal(G_W-8)            <= '0';
+                end if;
+
+                do_data_internal(G_W-5)                  <= '0';
+                do_data_internal(G_W-6)                  <= '0';
+                do_data_internal(G_W-7)                  <= cmd(G_W-7);
+                do_data_internal(G_W-1-(G_W/8)*4 downto 0) <= cmd(G_W-1-(G_W/8)*4 downto 0);
+
+            when S_HDR_MSGLEN =>
+                cmd_ready          <= do_ready;
+                len_SegLenCnt      <= do_ready and cmd_valid;
+                do_valid_internal  <= cmd_valid;
+                do_data_internal   <= cmd;
+
+            when S_OUT_MSG =>
+                bdo_ready          <= do_ready;
+                do_valid_internal  <= bdo_valid;
+                en_SegLenCnt       <= bdo_valid and do_ready;
+                do_data_internal   <= bdo_cleared;
+
+            --TAG
+            when S_HDR_TAG =>
+                do_valid_internal                      <='1';
+                do_data_internal(G_W-1 downto 0)         <= HDR_TAG_internal(31 downto 32-G_W);
+
+            when S_HDR_TAGLEN =>
+                do_valid_internal                      <='1';
+                do_data_internal(G_W-1 downto G_W-(G_W/8)*8) <= tag_size_bytes(G_W-1 downto G_W-(G_W/8)*8);
+
+            when S_OUT_TAG =>
+                bdo_ready         <= do_ready;
+                do_valid_internal <= bdo_valid;
+                do_data_internal  <= bdo_cleared;
+
+            when S_VER_TAG_IN =>
+                msg_auth_ready <= '1';
+
+            when S_STATUS_FAIL =>
+                do_valid_internal                <= '1';
+                do_last                          <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <="1111";
+                do_data_internal(G_W-5 downto 0)   <= (others=>'0');
+
+            when S_STATUS_SUCCESS =>
+                do_valid_internal                <= '1';
+                do_last                          <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <="1110";
+                do_data_internal(G_W-5 downto 0)   <= (others=>'0');
+
+        end case;
+    end process;
+
+end generate;
+
+
+
+   -- ====================================================================================================
+   --!  8 bit specific FSM -------------------------------------------------------------------------------
+   -- ====================================================================================================
+
+FSM_8BIT: if (G_W=8) generate
+
+    --! 8 Bit specific declarations
+    signal HDR_TAG_internal     : std_logic_vector(31 downto 0);
+    signal data_seg_length      : std_logic_vector(G_W-1 downto 0);
+    signal tag_size_bytes       : std_logic_vector(16  -1 downto 0);
+    signal do_data_t16          : std_logic_vector(16  -1 downto 0);
+    --Registers
+    signal nx_state, pr_state: t_state8;
+    signal dout_LenReg, nx_dout_LenReg : std_logic_vector(8   -1 downto 0);
+
+    
+    begin
+
+    --! Logics
+    data_seg_length  <= cmd;
+    tag_size_bytes   <= std_logic_vector(to_unsigned(TAGdiv8, 16));
+    load_SegLenCnt   <= dout_LenReg(7 downto 0) & data_seg_length(G_W-1 downto G_W-8);
+    do_data_t16      <= std_logic_vector(to_unsigned(HASHdiv8, 16));
+    HDR_TAG_internal <= HDR_TAG & x"300"& tag_size_bytes(15 downto 0);
+
+    --! Length register
+    LenReg: process (clk)
+    begin
+        if rising_edge(clk) then
+            dout_LenReg <= nx_dout_LenReg;
+        end if;
+    end process;
+    
+   --! State register
+   GEN_proc_SYNC_RST: if (not G_ASYNC_RSTN) generate
+        process (clk)
+        begin
+            if rising_edge(clk) then
+                if(rst='1')  then
+                    pr_state <= S_INIT;
+                else
+                    pr_state <= nx_state;
+                end if;
+            end if;
+        end process;
+    end generate GEN_proc_SYNC_RST;
+    GEN_proc_ASYNC_RSTN: if (G_ASYNC_RSTN) generate
+        process (clk, rst)
+        begin
+            if(rst='0')  then
+                pr_state <= S_INIT;
+            elsif rising_edge(clk) then
+                pr_state <= nx_state;
+            end if;
+        end process;
+    end generate GEN_proc_ASYNC_RSTN;
+
+    --! Next state function
+    process (pr_state, bdo_valid, do_ready, end_of_block, decrypt,
+            cmd_valid, cmd, msg_auth_valid, msg_auth, last_flit_of_segment,
+            dout_LenReg, eot)
+
+    begin
+
+        case pr_state is
+
+            when S_INIT=>
+                if (cmd_valid='1') then
+                    if (cmd(G_W-1 downto G_W-4) = INST_HASH) then
+                        nx_state <= S_HDR_HASH;
+                    else
+                        nx_state <= S_HDR_MSG;
+                    end if;
+                else
+                    nx_state <= S_INIT;
+                end if;
+
+            when S_HDR_HASH =>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_RESHASH;
+                else
+                    nx_state <= S_HDR_HASH;
+                end if;
+
+            when S_HDR_RESHASH=>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_HASHLEN_MSB;
+                else
+                    nx_state <= S_HDR_RESHASH;
+                end if;
+
+            when S_HDR_HASHLEN_MSB=>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_HASHLEN_LSB;
+                else
+                    nx_state <= S_HDR_HASHLEN_MSB;
+                end if;
+
+            when S_HDR_HASHLEN_LSB=>
+                if (do_ready='1') then
+                    nx_state <= S_OUT_HASH;
+                else
+                    nx_state <= S_HDR_HASHLEN_LSB;
+                end if;
+
+            when S_OUT_HASH =>
+                if (bdo_valid ='1' and do_ready ='1' and end_of_block ='1') then
+                    nx_state <= S_STATUS_SUCCESS;
+                else
+                    nx_state <= S_OUT_HASH;
+                end if;
+
+            when S_HDR_MSG=>
+                if (cmd_valid='1' and do_ready='1') then
+                        nx_state  <= S_HDR_RESMSG;
+                else
+                    nx_state <= S_HDR_MSG;
+                end if;
+
+            when S_HDR_RESMSG=>
+                if (cmd_valid='1' and do_ready='1') then
+                    nx_state <= S_HDR_MSGLEN_MSB;
+                else
+                    nx_state <= S_HDR_RESMSG;
+                end if;
+
+            when S_HDR_MSGLEN_MSB=>
+                if (cmd_valid='1' and do_ready='1') then
+                    nx_state <= S_HDR_MSGLEN_LSB;
+                else
+                    nx_state <= S_HDR_MSGLEN_MSB;
+                end if;
+
+            when S_HDR_MSGLEN_LSB=>
+                if (dout_LenReg=x"00" and cmd(7 downto 0)=x"00" and do_ready='1' and cmd_valid='1') then
+                    if (decrypt='1') then
+                            nx_state <= S_VER_TAG_IN;
+                        else
+                            nx_state <= S_HDR_TAG;
+                        end if;
+                elsif (cmd_valid='1' and do_ready='1') then
+                    nx_state <= S_OUT_MSG;
+                else
+                    nx_state <= S_HDR_MSGLEN_LSB;
+                end if;
+
+            when S_OUT_MSG =>
+                if (bdo_valid='1' and do_ready='1') then
+                    if (last_flit_of_segment='1') then
+                        if (eot = '1') then
+                            if (decrypt='1') then
+                                nx_state <= S_VER_TAG_IN;
+                            else
+                                nx_state <= S_HDR_TAG;
+                            end if;
+                        else
+                            nx_state <= S_HDR_MSG;
+                        end if;
+                    else
+                        nx_state <= S_OUT_MSG;
+                    end if;
+                else
+                    nx_state <= S_OUT_MSG;
+                end if;
+
+            --TAG
+            when S_HDR_TAG=>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_RESTAG;
+                else
+                    nx_state <= S_HDR_TAG;
+                end if;
+
+            when S_HDR_RESTAG=>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_TAGLEN_MSB;
+                else
+                    nx_state <= S_HDR_RESTAG;
+                end if;
+
+            when S_HDR_TAGLEN_MSB=>
+                if (do_ready='1') then
+                    nx_state <= S_HDR_TAGLEN_LSB;
+                else
+                    nx_state <= S_HDR_TAGLEN_MSB;
+                end if;
+
+            when S_HDR_TAGLEN_LSB=>
+                if (do_ready='1') then
+                    nx_state <= S_OUT_TAG;
+                else
+                    nx_state <= S_HDR_TAGLEN_LSB;
+                end if;
+
+            when S_OUT_TAG =>
+                if (bdo_valid='1' and end_of_block='1' and do_ready='1') then
+                    nx_state <= S_STATUS_SUCCESS;
+                else
+                    nx_state <= S_OUT_TAG;
+                end if;
+
+            when  S_VER_TAG_IN=>
+                if (msg_auth_valid='1') then
+                    if (msg_auth='1') then
+                        nx_state <= S_STATUS_SUCCESS;
+                    else
+                        nx_state <= S_STATUS_FAIL;
+                    end if;
+                else
+                    nx_state <= S_VER_TAG_IN;
+                end if;
+
+            when  S_STATUS_FAIL=>
+                if (do_ready='1') then
+                    nx_state<= S_INIT;
+                else
+                    nx_state<= S_STATUS_FAIL;
+                end if;
+
+            when  S_STATUS_SUCCESS=>
+                if (do_ready='1') then
+                    nx_state<= S_INIT;
+                else
+                    nx_state<= S_STATUS_SUCCESS;
+                end if;
+
+
+            when others=>
+                nx_state <= S_INIT;
+        end case;
+    end process;
+
+    --! Output state function
+    process(pr_state,bdo_valid, end_of_block,msg_auth_valid,msg_auth,
+            decrypt, cmd,cmd_valid,do_ready, eot, dout_LenReg, bdo_cleared,
+            do_data_t16, HDR_TAG_internal, tag_size_bytes, data_seg_length)
+    begin
+        -- DEFAULT Values
+        -- external interface
+        do_last            <='0';
+        do_valid_internal  <='0';
+        do_data_internal   <= (others => '-');
+        -- Ciphercore
+        bdo_ready          <='0';
+        msg_auth_ready     <='0';
+        --Header/tag-FIFO
+        cmd_ready          <='0';
+        -- Segment counter
+        len_SegLenCnt      <='0';
+        en_SegLenCnt       <='0';
+        -- Registers
+        nx_eot             <= eot;
+        nx_decrypt         <= decrypt;
+        nx_dout_LenReg     <= dout_LenReg;
+
+        case pr_state is
+
+            when S_INIT =>
+                if (cmd_valid = '1') then
+                    nx_decrypt <= cmd(G_W-4);
+                end if;
+                cmd_ready <= '1';
+                nx_eot    <= '0';
+
+            --HASH
+            when S_HDR_HASH =>
+                do_valid_internal                <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <= HDR_HASH_VALUE;
+                do_data_internal(G_W-5 downto G_W-7) <= "001";
+                do_data_internal(G_W-8)            <= '1';
+
+            when S_HDR_RESHASH =>
+                do_valid_internal  <= '1';
+                do_data_internal   <= (others => '0');
+
+            when S_HDR_HASHLEN_MSB =>
+                do_valid_internal  <= '1';
+                do_data_internal   <= do_data_t16(15 downto 8);
+
+            when S_HDR_HASHLEN_LSB =>
+                do_valid_internal  <= '1';
+                do_data_internal   <= do_data_t16(7 downto 0);
+
+            when S_OUT_HASH =>
+                bdo_ready          <= do_ready;
+                do_valid_internal  <= bdo_valid;
+                do_data_internal   <= bdo_cleared;
+
+            --!MSG/CT
+            when S_HDR_MSG =>
+                cmd_ready          <= do_ready;
+                do_valid_internal  <= cmd_valid;
+                len_SegLenCnt      <= do_ready and cmd_valid;
+                nx_eot             <= cmd(G_W-7);
+                if(decrypt='1') then
+                    --header is msg
+                    do_data_internal(G_W-1 downto G_W-4) <= HDR_PT;
+                    do_data_internal(G_W-8)            <= '1' and cmd(G_W-7);
+                else
+                    ---header is ciphertext
+                    do_data_internal(G_W-1 downto G_W-4) <= HDR_CT;
+                    do_data_internal(G_W-8)            <= '0';
+                 end if;
+                do_data_internal(G_W-5) <= '0';
+                do_data_internal(G_W-6) <= '0';
+                do_data_internal(G_W-7) <= cmd(G_W-7);
+
+            when S_HDR_RESMSG =>
+                cmd_ready         <= do_ready;
+                do_valid_internal <= cmd_valid;
+                do_data_internal  <= cmd;
+
+            when S_HDR_MSGLEN_MSB =>
+                cmd_ready         <= do_ready;
+                if ((do_ready = '1') and (cmd_valid = '1')) then
+                    nx_dout_LenReg  <= data_seg_length(G_W-1 downto G_W-8);
+                end if;
+                do_valid_internal <= cmd_valid;
+                do_data_internal  <= cmd;
+
+            when S_HDR_MSGLEN_LSB =>
+                cmd_ready         <= do_ready;
+                len_SegLenCnt     <= do_ready and cmd_valid;
+                do_valid_internal <= cmd_valid;
+                do_data_internal  <= cmd;
+
+            when S_OUT_MSG =>
+                bdo_ready         <= do_ready;
+                do_valid_internal <= bdo_valid;
+                en_SegLenCnt      <= bdo_valid and do_ready;
+                do_data_internal  <= bdo_cleared;
+
+            --TAG
+            when S_HDR_TAG =>
+                do_valid_internal                <='1';
+                do_data_internal(G_W-1 downto 0)   <= HDR_TAG_internal(31 downto 32-G_W);
+
+            when S_HDR_RESTAG =>
+                do_valid_internal <='1';
+                do_data_internal  <= (others=>'0');
+
+            when S_HDR_TAGLEN_MSB =>
+                do_valid_internal                <='1';
+                do_data_internal(G_W-1 downto G_W-8) <= tag_size_bytes(15 downto 8);
+
+            when S_HDR_TAGLEN_LSB =>
+                do_valid_internal                <='1';
+                do_data_internal(G_W-1 downto G_W-8) <= tag_size_bytes(7 downto 0);
+
+            when S_OUT_TAG =>
+                bdo_ready         <= do_ready;
+                do_valid_internal <= bdo_valid;
+                do_data_internal  <= bdo_cleared;
+
+            when S_VER_TAG_IN =>
+                msg_auth_ready    <= '1';
+
+            when S_STATUS_FAIL =>
+                do_valid_internal                <= '1';
+                do_last                          <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <="1111";
+                do_data_internal(G_W-5 downto 0)   <= (others=>'0');
+
+            when S_STATUS_SUCCESS =>
+                do_valid_internal                <= '1';
+                do_last                          <= '1';
+                do_data_internal(G_W-1 downto G_W-4) <="1110";
+                do_data_internal(G_W-5 downto 0)   <= (others=>'0');
 
         end case;
     end process;

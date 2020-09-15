@@ -19,7 +19,7 @@ use ieee.numeric_std.all;
 use work.NIST_LWAPI_pkg.all;
 
 entity fwft_fifo is
-    generic(
+	generic(
         G_W         : integer; --! Width of I/O (bits)
         G_LOG2DEPTH : integer  --! LOG(2) of depth
     );
