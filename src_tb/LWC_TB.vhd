@@ -36,9 +36,9 @@ entity LWC_TB IS
         G_TEST_OSTALL       : integer := 40;
         G_LOG2_FIFODEPTH    : integer := 8;
         G_PERIOD            : time    := 10 ns;
-        G_FNAME_PDI         : string  := "pdi.txt";
-        G_FNAME_SDI         : string  := "sdi.txt";
-        G_FNAME_DO          : string  := "do.txt";
+        G_FNAME_PDI         : string  := "../KAT/v1/pdi.txt";
+        G_FNAME_SDI         : string  := "../KAT/v1/sdi.txt";
+        G_FNAME_DO          : string  := "../KAT/v1/do.txt";
         G_FNAME_LOG         : string  := "log.txt";
         G_FNAME_TIMING      : string  := "timing.txt";
         G_FNAME_TIMING_CSV  : string  := "timing.csv";
@@ -162,7 +162,6 @@ architecture behavior of LWC_TB is
     file result_file    : text open write_mode is G_FNAME_RESULT;
     file failures_file  : text open write_mode is G_FNAME_FAILED_TVS;
     ------------- end of input files --------------------
---    signal TestVector : integer;
 	
 	----------------- component decrations ------------------
 	-- LWC is instantiated as component to make mixed-language simulation possible
@@ -495,8 +494,7 @@ begin
                         or (opcode = INST_SUCCESS or opcode = INST_FAILURE))
                     then
                         write(logMsg, string'("[Log] == Verifying msg ID #")
-                            & integer'image(msgid)
-                            & string'(" with key ID #") & integer'image(keyid));
+                            & integer'image(testcase));
                         if (opcode = INST_ENC) then
                             isEncrypt := True;
                             write(logMsg, string'(" for ENC"));
@@ -508,8 +506,8 @@ begin
                         writeline(log_file,logMsg);
                     end if;
 
-                    report "---------Started verifying message number "
-                        & integer'image(msgid) & " at "
+                    report "---------Started verifying MsgID = "
+                        & integer'image(testcase) & " at "
                         & time'image(now) severity note;
                 else
                     LWC_HREAD(line_data, word_block, read_result); --! read data
@@ -556,14 +554,14 @@ begin
                     write(result_file, string'("fail"));
                     num_fails := num_fails + 1;
                     write(failMsg,  string'("Failure #") & integer'image(num_fails)
-                    	& " MsgID: " & integer'image(testcase) & " Operation: ");
-                    if (opcode = INST_ENC) then
-                        write(failMsg, string'("ENC"));
-                    elsif(opcode = INST_HASH) then
-                        write(failMsg, string'("HASH"));
-                    else
-                        write(failMsg, string'("DEC"));
-                    end if;
+                    	& " MsgID: " & integer'image(testcase));-- & " Operation: ");
+--                    if (opcode = INST_ENC) then
+--                        write(failMsg, string'("ENC"));
+--                    elsif(opcode = INST_HASH) then
+--                        write(failMsg, string'("HASH"));
+--                    else
+--                        write(failMsg, string'("DEC"));
+--                    end if;
                     write(failMsg, string'(" Line: ") & integer'image(line_no)
                     	& " Word: " & integer'image(word_count)
                     	& " Expected: " & LWC_TO_HSTRING(word_block)
@@ -687,11 +685,13 @@ begin
                                 charindex := charindex + 1;
                             end loop;
                             block_size_ad := (integer'value(temp_read(charindex+1 to linelength))) / 8;
-                        elsif temp_read(1 to 21) = "# message_digest_size" then
+                        elsif temp_read(1 to 23) = "# block_size_msg_digest" then
                             while temp_read(charindex) /= '-' loop
                                 charindex := charindex + 1;
                             end loop;
-                            block_size_hash := (integer'value(temp_read(charindex+1 to linelength))) / 8;
+                            if temp_read(linelength-3 to linelength) /= "None" then
+                                block_size_hash := integer'value(temp_read(charindex+1 to linelength))/8;
+                            end if;
                             exit;
                          end if;
                 end loop;
@@ -756,8 +756,9 @@ begin
 
                         wait until falling_edge(clk);
                         stall_msg <= '1'; -- last segment  wait until cipher is done
-                        
-                        wait until (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD));
+                        if (do_last /= '1' or (do /= SUCCESS_WORD and do /= FAILURE_WORD)) then
+                                wait until (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD));
+                        end if;
                         stall_msg <= '0';
                         exec_time := clk_cycle_counter-msg_start_time;
                         msg_idx := msg_idx + 1;
@@ -782,7 +783,7 @@ begin
                                 end if;
                             end if;
                             start_latency_timer <= '0';
-                            if (do_last /= '1' or (do /= SUCCESS_WORD and do /= FAILURE_WORD)) then
+		            if (do_last /= '1' or (do /= SUCCESS_WORD and do /= FAILURE_WORD)) then
                                 wait until (do_last = '1' and (do = SUCCESS_WORD or do = FAILURE_WORD));
                             end if;
                             stall_msg <= '0';
