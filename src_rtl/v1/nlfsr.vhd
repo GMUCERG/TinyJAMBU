@@ -48,7 +48,7 @@ feedback    <= reg((91 + CONCURRENT) - 1 downto 91) xor
                 nand_out xor 
                 reg((47 + CONCURRENT) - 1 downto 47) xor 
                 reg((0 + CONCURRENT) - 1 downto 0) xor 
-                key((to_integer(counter) + CONCURRENT) - 1 downto to_integer(counter));
+                std_logic_vector(shift_right(unsigned(key), to_integer(counter))(CONCURRENT - 1 downto 0));
 
 output      <= reg;
 
