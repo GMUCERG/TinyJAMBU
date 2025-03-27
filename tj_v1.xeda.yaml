@@ -1,0 +1,28 @@
+sources:
+  - LWC/LWC_config_32.vhd
+  - LWC/NIST_LWAPI_pkg.vhd
+  - src_rtl/v1/design_pkg.vhd
+  - src_rtl/v1/nlfsr.vhd
+  - src_rtl/v1/tinyjambu_control.vhd
+  - src_rtl/v1/tinyjambu_datapath.vhd
+  - src_rtl/v1/CryptoCore.vhd
+  - LWC/PISO.vhd
+  - LWC/SIPO.vhd
+  - LWC/FIFO.vhd
+  - LWC/PreProcessor.vhd
+  - LWC/PostProcessor.vhd
+  - LWC/LWC.vhd
+
+top: LWC
+
+test:
+  sources:
+    - src_tb/LWC_TB.vhd
+  top: LWC_TB
+  parameters:
+    G_FNAME_PDI:
+      file: KAT/pdi.txt
+    G_FNAME_SDI:
+      file: KAT/sdi.txt
+    G_FNAME_DO:
+      file: KAT/do.txt
