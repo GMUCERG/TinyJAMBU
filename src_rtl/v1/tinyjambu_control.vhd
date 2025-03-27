@@ -134,9 +134,9 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         end if;
     end process;
     
-    process(state, key_valid, key_update, key_count,
-            bdi_valid, bdi_eoi, bdi_eot, cycles,
-            bdi, bdo, key, msg_auth_ready)
+    process(state, key_valid, key_update, key_count, decrypt_in, auth_failed,
+            bdi, bdi_valid, bdi_eoi, bdi_eot, bdi_type, bdi_size, bdi_valid_bytes,
+            bdo, bdo_ready, npub, msg_auth_ready, cycles)
         begin
         -- Default values
         nlfsr_en            <= '0';
