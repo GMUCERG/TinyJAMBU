@@ -252,7 +252,7 @@ begin
                   seglen_counter_hi <= seglen_counter_hi - 1;
                end if;
             when others =>
-               null;
+               -- null;
          end case;
       end if;
    end process;

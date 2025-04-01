@@ -212,6 +212,7 @@ begin
     -- for depth > 2 (or non-isolating depth=2) implement as circular buffer
     GEN_DEPTH_GT_2 : if (G_DEPTH > 2 or (G_DEPTH = 2 and not G_ELASTIC_2)) and G_RAM_STYLE /= "block" generate
         -- registers
+        constant ZEROS           : unsigned(DEPTH_BITS - 2 downto 0) := (others => '0');
         signal rd_ptr, wr_ptr            : unsigned(DEPTH_BITS - 1 downto 0);
         signal empty                     : std_logic;
         --========================================= Wires ===========================================--
@@ -219,8 +220,10 @@ begin
         signal enq, deq                  : std_logic;
         signal din_ready_o, dout_valid_o : std_logic; -- VHDL < 2008 compatibility
     begin
+        -- pragma translate_off
         assert FALSE report "FIFO of depth " & -- print information
         integer'image(G_DEPTH) & " implemented as circular buffer" severity note;
+        -- pragma translate_on
 
         din_ready    <= din_ready_o;
         dout_valid   <= dout_valid_o;
@@ -273,7 +276,7 @@ begin
                     rd_ptr <= (others => '0');
                     if enq = '1' then
                         storage(0) <= din;
-                        wr_ptr     <= (0 => '1', others => '0');
+                        wr_ptr     <= ZEROS & '1';
                     else
                         wr_ptr <= (others => '0');
                     end if;

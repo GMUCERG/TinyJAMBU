@@ -18,7 +18,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-library work;
 use work.design_pkg.all;
 use work.NIST_LWAPI_pkg.all;
 
@@ -30,26 +29,24 @@ entity tinyjambu_control is
         -- Datapath control signals
         key_index       : out std_logic_vector      (1          downto 0);
         key_load        : out std_logic;
-        d_index         : out std_logic_vector      (1          downto 0);
         d_load          : out std_logic;
         decrypt_out     : out std_logic;
-        nlfsr_reset     : out std_logic;
         nlfsr_en        : out std_logic;
         nlfsr_load      : out std_logic;
+        nlfsr_init      : out std_logic;
         partial         : out std_logic;
         bdo_sel         : out std_logic;
         fbits_sel       : out std_logic_vector      (1          downto 0);
         s_sel           : out std_logic_vector      (1          downto 0);
         partial_bytes   : out std_logic_vector      (1          downto 0);
         -- CryptoCore Control Signals
-        key             : in std_logic_vector       (CCSW-1     downto 0);
         key_valid       : in std_logic;
         key_update      : in std_logic;
         key_ready       : out std_logic;
         bdi_valid       : in std_logic;
         bdi             : in std_logic_vector       (CCW-1      downto 0);
         bdi_ready       : out std_logic;
-        bdi_pad_loc     : in std_logic_vector       (CCWdiv8-1  downto 0);
+        -- bdi_pad_loc     : in std_logic_vector       (CCWdiv8-1  downto 0);
         bdi_valid_bytes : in std_logic_vector       (CCWdiv8-1  downto 0);
         bdi_size        : in std_logic_vector       (3      -1  downto 0);
         bdi_eoi         : in std_logic;
@@ -93,8 +90,8 @@ ENCRYPT_A, ENCRYPT_B, ENCRYPT_C,
 -- Generate the 64 bit tag
 TAG_A, TAG_B, TAG_C, TAG_D, TAG_E, TAG_F);
 
-signal state            : state_type := IDLE;
-signal next_state       : state_type := IDLE;
+signal state            : state_type;
+signal next_state       : state_type;
 
 signal key_count        : unsigned (2 downto 0);
 signal next_key_count   : unsigned (2 downto 0);
@@ -119,7 +116,6 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
                 npub        <= (others => '0');
                 key_count   <= (others => '0');
                 cycles      <= (others => '0');
-                
                 auth_failed <= '0';
             else
                 state       <= next_state;
@@ -134,14 +130,14 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         end if;
     end process;
     
-    process(state, key_valid, key_update, key_count, decrypt_in, auth_failed,
+    process(state, key_valid, key_count, decrypt_in, auth_failed, -- key_update, 
             bdi, bdi_valid, bdi_eoi, bdi_eot, bdi_type, bdi_size, bdi_valid_bytes,
             bdo, bdo_ready, npub, msg_auth_ready, cycles)
         begin
         -- Default values
         nlfsr_en            <= '0';
-        nlfsr_reset         <= '0';
-        nlfsr_load          <= '0'; 
+        nlfsr_load          <= '0';
+        nlfsr_init          <= '0';
         decrypt_out         <= '0';
         key_load            <= '0';
         key_ready           <= '0';
@@ -168,12 +164,11 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         
         case state is 
         when IDLE => 
-            --bdi_ready       <= '1';
             s_sel           <= b"11";
-            nlfsr_reset     <= '1';
-            if (key_valid = '1' and key_update = '1') then
-                next_state  <= LOAD_KEY;
-            end if;
+            nlfsr_init      <= '1';
+            -- if (key_valid = '1' and key_update = '1') then
+            next_state  <= LOAD_KEY;
+            -- end if;
         when LOAD_KEY =>
             key_ready       <= '1';
             next_key_count  <= key_count;

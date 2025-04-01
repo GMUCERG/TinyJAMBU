@@ -1,3 +1,5 @@
+hdl.vhdl.standard: 2008
+
 sources:
   - LWC/LWC_config_32.vhd
   - LWC/NIST_LWAPI_pkg.vhd
@@ -14,9 +16,12 @@ sources:
   - LWC/LWC.vhd
 
 top: LWC
+clock.port: clk
 
 test:
   sources:
+    - LWC/LWC_config_32.vhd
+    - LWC/NIST_LWAPI_pkg.vhd
     - src_tb/LWC_TB.vhd
   top: LWC_TB
   parameters:
@@ -26,3 +31,16 @@ test:
       file: KAT/sdi.txt
     G_FNAME_DO:
       file: KAT/do.txt
+
+
+flows:
+  dc:
+    outputs_dir: $PWD/v1_netlist
+    target_libraries:
+      - lib/SAED90/saed90nm_typ_ht.db
+    clock.freq: 20MHz
+    optimization: none
+    # compile_command: compile_ultra
+    compile_command: compile
+    # sdc_files:
+    #   - v1_constraints.sdc

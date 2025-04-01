@@ -340,63 +340,74 @@ begin
    process(clk)
    begin
       if rising_edge(clk) then
-         case state is
-            when S_INST =>
-               hash_op    <= False;
-               decrypt_op <= False;
-               -- not really required:
-               eoi_flag   <= '0';
-               eot_flag   <= '0';
-               last_flag  <= '0';
+         if rst = '1' then
+            seglen_counter <= (others => '0');
+            seglen_counter_hi <= (others => '0');
+            eoi_flag   <= '0';
+            eot_flag   <= '0';
+            last_flag  <= '0';
+            decrypt_op <= false;
+            hash_op    <= false;
+            hdr_type   <= (others => '0');
+         else
+            case state is
+               when S_INST =>
+                  hash_op    <= False;
+                  decrypt_op <= False;
+                  -- not really required:
+                  eoi_flag   <= '0';
+                  eot_flag   <= '0';
+                  last_flag  <= '0';
 
-               if pdi_fire then
-                  if op_is_actkey then
-                  elsif op_is_hash then
-                     hash_op <= TRUE;
-                  else
-                     decrypt_op <= pdi_hdr_type(0) = '1';
+                  if pdi_fire then
+                     if op_is_actkey then
+                     elsif op_is_hash then
+                        hash_op <= TRUE;
+                     else
+                        decrypt_op <= pdi_hdr_type(0) = '1';
+                     end if;
                   end if;
-               end if;
 
-            when S_SDI_HDR =>
-               if sdi_fire then
-                  if hdr_last then
-                     seglen_counter <= unsigned(seglen);
+               when S_SDI_HDR =>
+                  if sdi_fire then
+                     if hdr_last then
+                        seglen_counter <= unsigned(seglen);
+                     end if;
                   end if;
-               end if;
 
-            when S_SDI_KEY =>
-               if sdi_fire then
-                  seglen_counter_hi <= seglen_counter_hi - 1;
-               end if;
-
-            when S_PDI_DATA =>
-               if pdi_fire then
-                  seglen_counter_hi <= seglen_counter_hi - 1;
-               end if;
-
-            when S_PDI_HDR =>
-               if pdi_fire then
-                  if hdr_first then
-                     eoi_flag  <= pdi_hdr_eoi;
-                     eot_flag  <= pdi_hdr_eot;
-                     last_flag <= pdi_hdr_last;
-                     hdr_type  <= pdi_hdr_type;
+               when S_SDI_KEY =>
+                  if sdi_fire then
+                     seglen_counter_hi <= seglen_counter_hi - 1;
                   end if;
-                  if hdr_last then
-                     seglen_counter <= unsigned(seglen);
-                  end if;
-               end if;
 
-            when others =>
-               null;
-         end case;
-         --! for simulation only
-         -- synthesis translate_off
-         assert not received_wrong_header
-         report "[PreProcessor] Received unexpected header at state: " & t_state'image(state)
-         severity failure;
-         -- synthesis translate_on
+               when S_PDI_DATA =>
+                  if pdi_fire then
+                     seglen_counter_hi <= seglen_counter_hi - 1;
+                  end if;
+
+               when S_PDI_HDR =>
+                  if pdi_fire then
+                     if hdr_first then
+                        eoi_flag  <= pdi_hdr_eoi;
+                        eot_flag  <= pdi_hdr_eot;
+                        last_flag <= pdi_hdr_last;
+                        hdr_type  <= pdi_hdr_type;
+                     end if;
+                     if hdr_last then
+                        seglen_counter <= unsigned(seglen);
+                     end if;
+                  end if;
+
+               when others =>
+                  null;
+            end case;
+            --! for simulation only
+            -- synthesis translate_off
+            assert not received_wrong_header
+            report "[PreProcessor] Received unexpected header at state: " & t_state'image(state)
+            severity warning;
+            -- synthesis translate_on
+         end if;
       end if;
    end process;
 

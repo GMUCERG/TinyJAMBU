@@ -20,53 +20,52 @@ use ieee.numeric_std.all;
 
 entity nlfsr is
 
-    generic (
-        WIDTH       : integer   := 128;
-        CONCURRENT  : natural   := 1
+    generic(
+        WIDTH      : integer := 128;
+        CONCURRENT : natural := 1
     );
-    port (
-        clk         : in std_logic;
-        reset       : in std_logic;
-        enable      : in std_logic;
-        key         : in std_logic_vector (WIDTH-1 downto 0);
-        load        : in std_logic;
-        input       : in std_logic_vector (WIDTH-1 downto 0);
-        output      : out std_logic_vector (WIDTH-1 downto 0)
+    port(
+        clk    : in  std_logic;
+        reset  : in  std_logic;
+        init   : in  std_logic;
+        enable : in  std_logic;
+        key    : in  std_logic_vector(WIDTH - 1 downto 0);
+        load   : in  std_logic;
+        input  : in  std_logic_vector(WIDTH - 1 downto 0);
+        output : out std_logic_vector(WIDTH - 1 downto 0)
     );
+    attribute keep_hierarchy : string;
+    attribute keep_hierarchy of nlfsr : entity is "true";
 end entity nlfsr;
 
 architecture behavioral of nlfsr is
-signal reg      : std_logic_vector (WIDTH-1 downto 0);
-signal feedback : std_logic_vector (CONCURRENT-1 downto 0);
-signal nand_out : std_logic_vector (CONCURRENT-1 downto 0);
-signal counter  : unsigned (6 downto 0);
-
+    signal reg      : std_logic_vector(WIDTH - 1 downto 0);
+    signal feedback : std_logic_vector(CONCURRENT - 1 downto 0);
+    signal nand_out : std_logic_vector(CONCURRENT - 1 downto 0);
+    signal counter  : unsigned(6 downto 0);
 begin
-nand_out    <= reg((70 + CONCURRENT) - 1 downto 70) nand reg((85 + CONCURRENT) - 1 downto 85);
+    nand_out <= reg((70 + CONCURRENT) - 1 downto 70) nand reg((85 + CONCURRENT) - 1 downto 85);
 
-feedback    <= reg((91 + CONCURRENT) - 1 downto 91) xor 
-                nand_out xor 
-                reg((47 + CONCURRENT) - 1 downto 47) xor 
-                reg((0 + CONCURRENT) - 1 downto 0) xor 
-                std_logic_vector(shift_right(unsigned(key), to_integer(counter))(CONCURRENT - 1 downto 0));
+    feedback <= reg((91 + CONCURRENT) - 1 downto 91) xor nand_out xor reg((47 + CONCURRENT) - 1 downto 47) xor reg((0 + CONCURRENT) - 1 downto 0) xor std_logic_vector(shift_right(unsigned(key), to_integer(counter))(CONCURRENT - 1 downto 0));
 
-output      <= reg;
+    output <= reg;
 
     shift_reg : process(clk)
-
     begin
         if rising_edge(clk) then
             if (reset = '1') then
-                reg <= (others => '0');
+                reg     <= (others => '0');
+                counter <= (others => '0');
+            elsif (init = '1') then
+                reg     <= (others => '0');
                 counter <= (others => '0');
             elsif (load = '1') then
-                reg <= input;
+                reg     <= input;
                 counter <= (others => '0');
             elsif (enable = '1') then
-                counter <= counter + CONCURRENT;
-
-                reg(reg'high downto (reg'high - (CONCURRENT-1))) <= feedback;
-                reg((reg'high - CONCURRENT) downto 0) <= reg(reg'high downto CONCURRENT);
+                reg(reg'high downto (reg'high - (CONCURRENT - 1))) <= feedback;
+                reg((reg'high - CONCURRENT) downto 0)              <= reg(reg'high downto CONCURRENT);
+                counter                                            <= counter + CONCURRENT;
             end if;
         end if;
 

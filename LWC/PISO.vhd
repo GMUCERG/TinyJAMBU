@@ -97,6 +97,7 @@ begin
         signal last_or_empty               : std_logic;
     begin
 
+        -- pragma translate_off
         assert FALSE
         report LF & "PISO instance parameters:" --
         & LF & "  G_OUT_W       " & integer'image(G_OUT_W) --
@@ -106,6 +107,7 @@ begin
         & LF & "  G_ASYNC_RSTN  " & boolean'image(G_ASYNC_RSTN) --
         & LF & "  G_BIGENDIAN   " & boolean'image(G_BIGENDIAN) --
         severity NOTE;
+        -- pragma translate_on
 
         in_fire       <= p_in_valid = '1' and p_in_ready_o;
         out_fire      <= s_out_ready = '1' and s_out_valid_o;

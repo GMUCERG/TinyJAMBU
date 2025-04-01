@@ -53,9 +53,9 @@ entity SIPO is
         rst        : in  std_logic;
         --! Serial Input
         sin_data   : in  std_logic_vector(G_CHANNELS * G_IN_W - 1 downto 0);
-        sin_keep   : in  std_logic_vector(G_IN_W / 8 - 1 downto 0) := (others => '0');
+        sin_keep   : in  std_logic_vector(G_IN_W / 8 - 1 downto 0);
         -- last input word. The output will be then ready, even if less than G_IN parts are filled in
-        sin_last   : in  std_logic                                 := '0';
+        sin_last   : in  std_logic;
         sin_valid  : in  std_logic;
         sin_ready  : out std_logic;
         --! Parallel Output
@@ -117,15 +117,16 @@ begin
         end function;
 
         --======================================== Constants ====================================--
-        constant INIT_MARKER : std_logic_vector(0 to BUFF_WORDS) := (0 => '1', others => '0');
-
+        constant ZEROS : std_logic_vector(0 to BUFF_WORDS - 2) := (others => '0');
+        constant INIT_MARKER : std_logic_vector(0 to BUFF_WORDS) := "10" & ZEROS;
+        
         --========================================== Types ======================================--
         type t_sin_data_arr is array (0 to G_CHANNELS - 1) of std_logic_vector(G_IN_W - 1 downto 0);
         type t_data is array (0 to BUFF_WORDS - 1) of std_logic_vector(G_IN_W - 1 downto 0);
         type t_data_arr is array (0 to G_CHANNELS - 1) of t_data;
         type t_pout_data is array (0 to G_N - 1) of std_logic_vector(G_IN_W - 1 downto 0);
         type t_pout_data_arr is array (0 to G_CHANNELS - 1) of t_pout_data;
-
+        
         --======================================== Registers ====================================--
         signal data   : t_data_arr;
         -- Fill gauge one-hot marker (shift-register)
@@ -134,11 +135,11 @@ begin
         -- `marker[BUFF_WORDS]` indicates the buffer is full
         -- initialized with "10...0" @reset
         signal marker : std_logic_vector(0 to BUFF_WORDS);
-
+        
         --========================================== Wires ======================================--
         --! Next value of the 'marker' register
         --! feedback style to support both sync and async resset options
-        signal nx_marker                  : std_logic_vector(marker'range);
+        signal nx_marker                  : std_logic_vector(0 to BUFF_WORDS);
         signal in_fire, out_fire, is_full : boolean;
         signal pout_valid_o, sin_ready_o  : boolean;
         signal pout_array                 : t_pout_data_arr;
@@ -151,6 +152,7 @@ begin
         in_fire    <= sin_valid = '1' and sin_ready_o;
         out_fire   <= pout_ready = '1' and pout_valid_o;
 
+        -- pragma translate_off
         assert FALSE report LF & "SIPO instance parameters:" --
         & LF & "  G_IN_W                " & integer'image(G_IN_W) --
         & LF & "  G_N                   " & integer'image(G_N) --
@@ -161,6 +163,7 @@ begin
         & LF & "  G_SUBWORD             " & boolean'image(G_SUBWORD) --
         & LF & "  G_CLEAR_INVALID_BYTES " & boolean'image(G_CLEAR_INVALID_BYTES) --
         severity NOTE;
+        -- pragma translate_on
 
         assert not (G_PIPELINED and G_SUBWORD)                    -- invalid or not supported parameter combinations
         report "Parameter combination is not supported!"
@@ -179,7 +182,7 @@ begin
         --==================================== GEN_PIPELINED ====================================--
         GEN_PIPELINED : if G_PIPELINED generate
             pout_valid_o <= is_full;
-            nx_marker    <= (1 => '1', others => '0') when in_fire and out_fire else
+            nx_marker    <= "01" & ZEROS when in_fire and out_fire else
                             INIT_MARKER when out_fire else
                             '0' & marker(0 to BUFF_WORDS - 1) when in_fire else
                             marker;

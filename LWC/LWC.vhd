@@ -30,7 +30,7 @@
 --!          |              |--'                  '->|               |
 --!    PDI-->|              |     .------------.     |               |  .----.
 --!          | PreProcessor |---->|            |     | PostProcessor |--|FIFO|->DO
---!    SDI-->|              |     | CryptoCore |---->|               |  '----'
+--!    SDI-->|              |     | cryptocore |---->|               |  '----'
 --!          |              |---->|            |     |               | optional
 --!          '--------------'     '------------'     '---------------'
 --!
@@ -90,11 +90,11 @@ end entity;
 -- architecture structure of LWC_SCA is
 --/-
 architecture structure of LWC is
-    ------!Pre-Processor to CryptoCore (Key PISO)
+    ------!Pre-Processor to cryptocore (Key PISO)
     signal key_cipher_in              : std_logic_vector(SDI_SHARES * CCSW - 1 downto 0);
     signal key_valid_cipher_in        : std_logic;
     signal key_ready_cipher_in        : std_logic;
-    ------!Pre-Processor to CryptoCore (DATA PISO)
+    ------!Pre-Processor to cryptocore (DATA PISO)
     signal bdi_cipher_in              : std_logic_vector(PDI_SHARES * CCW - 1 downto 0);
     signal bdi_valid_cipher_in        : std_logic;
     signal bdi_ready_cipher_in        : std_logic;
@@ -108,11 +108,11 @@ architecture structure of LWC is
     signal decrypt_cipher_in          : std_logic;
     signal hash_cipher_in             : std_logic;
     signal key_update_cipher_in       : std_logic;
-    ------!CryptoCore(DATA SIPO) to Post-Processor
+    ------!cryptocore(DATA SIPO) to Post-Processor
     signal bdo_cipher_out             : std_logic_vector(PDI_SHARES * CCW - 1 downto 0);
     signal bdo_valid_cipher_out       : std_logic;
     signal bdo_ready_cipher_out       : std_logic;
-    ------!CryptoCore to Post-Processor
+    ------!cryptocore to Post-Processor
     signal bdo_last_cipher_out        : std_logic;
     signal bdo_valid_bytes_cipher_out : std_logic_vector(CCW / 8 - 1 downto 0);
     signal bdo_type_cipher_out        : std_logic_vector(4 - 1 downto 0);
@@ -136,7 +136,7 @@ architecture structure of LWC is
 
     --============================================ Component Declarations ===========================================--
     --/+
-    -- component CryptoCore_SCA
+    -- component cryptocore_SCA
     --/-
     component CryptoCore
         port(
@@ -247,10 +247,7 @@ begin
             cmd_valid       => cmd_valid_FIFO_in,
             cmd_ready       => cmd_ready_FIFO_in
         );
-    --/+
-    -- Inst_CryptoCore : CryptoCore_SCA
-    --/-
-    Inst_CryptoCore : CryptoCore
+    inst_cryptocore : CryptoCore
         port map(
             clk             => clk,
             rst             => rst,
