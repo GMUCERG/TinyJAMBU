@@ -35,12 +35,9 @@ test:
 
 flows:
   dc:
-    outputs_dir: $PWD/v1_netlist
+    outputs_dir: $DESIGN_ROOT/v1_netlist
     target_libraries:
-      - lib/SAED90/saed90nm_typ_ht.db
-    clock.freq: 20MHz
-    optimization: none
-    # compile_command: compile_ultra
-    compile_command: compile
-    # sdc_files:
-    #   - v1_constraints.sdc
+      - $PWD/lib/SAED90/saed90nm_typ_ht.db
+    clock.freq: 50MHz
+    optimization: area
+    compile_command: compile_ultra
