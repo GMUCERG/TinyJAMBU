@@ -29,7 +29,6 @@ entity tinyjambu_control is
         -- Datapath control signals
         key_index       : out std_logic_vector      (1          downto 0);
         key_load        : out std_logic;
-        d_load          : out std_logic;
         decrypt_out     : out std_logic;
         nlfsr_en        : out std_logic;
         nlfsr_load      : out std_logic;
@@ -41,7 +40,7 @@ entity tinyjambu_control is
         partial_bytes   : out std_logic_vector      (1          downto 0);
         -- CryptoCore Control Signals
         key_valid       : in std_logic;
-        key_update      : in std_logic;
+        -- key_update      : in std_logic;
         key_ready       : out std_logic;
         bdi_valid       : in std_logic;
         bdi             : in std_logic_vector       (CCW-1      downto 0);
@@ -58,7 +57,7 @@ entity tinyjambu_control is
         bdo_valid       : out std_logic;
         bdo_valid_bytes : out std_logic_vector      (CCWdiv8-1  downto 0);
         end_of_block    : out std_logic;
-        hash_in         : in std_logic;
+        -- hash_in         : in std_logic;
 
         msg_auth_ready  : in  std_logic;
         msg_auth_valid  : out std_logic;
@@ -144,7 +143,6 @@ key_index               <= std_logic_vector (key_count(1 downto 0));
         bdi_ready           <= '0';
         bdo_valid           <= '0';
         end_of_block        <= '0';
-        d_load              <= '0';
         partial             <= '0';
         bdo_sel             <= '0';
         msg_auth_valid      <= '0';

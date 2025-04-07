@@ -97,6 +97,7 @@ begin
         pout_valid <= sin_valid;
         pout_last  <= sin_last;
         sin_ready  <= pout_ready;
+        pout_keep <= (others => '1');
     end generate GEN_TRIVIAL;
     --===========================================================================================--
     GEN_NONTRIVIAL : if G_N > 1 generate

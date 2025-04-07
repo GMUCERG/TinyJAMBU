@@ -342,7 +342,6 @@ begin
       if rising_edge(clk) then
          if rst = '1' then
             seglen_counter <= (others => '0');
-            seglen_counter_hi <= (others => '0');
             eoi_flag   <= '0';
             eot_flag   <= '0';
             last_flag  <= '0';

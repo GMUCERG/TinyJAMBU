@@ -32,12 +32,15 @@ test:
     G_FNAME_DO:
       file: KAT/do.txt
 
-
 flows:
   dc:
     outputs_dir: $DESIGN_ROOT/v1_netlist
     target_libraries:
-      - $PWD/lib/SAED90/saed90nm_typ_ht.db
-    clock.freq: 50MHz
+      # - $PWD/lib/SAED90/saed90nm_typ_ht.db
+      - $PWD/lib/SAED32/saed32hvt_tt0p85vn40c.db
+    clock.freq: 400MHz
+    # flatten: true
     optimization: area
     compile_command: compile_ultra
+    # sdc_files:
+    #   - v1_constraints.sdc

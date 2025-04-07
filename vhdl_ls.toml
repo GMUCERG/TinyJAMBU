@@ -1,0 +1,8 @@
+standard = "2008"
+
+# File names are either absolute or relative to the parent folder of the vhdl_ls.toml file
+[libraries]
+lab5.files = [
+    "src_rtl/v1/*.vhd",
+    "LWC/*.vhd",
+]
