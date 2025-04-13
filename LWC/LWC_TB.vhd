@@ -277,19 +277,12 @@ begin
         " -- Random Seed:   " & integer'image(G_RANDOM_SEED) & LF &
         CR severity note;
 
+        rst <= '0' when ASYNC_RSTN else '1' after input_delay;
         seed(G_RANDOM_SEED);
         wait for G_PRERESET_WAIT_PS * ps;
-        if ASYNC_RSTN then
-            rst <= '0';
-            wait for 2.5 * clk_period;
-            rst <= '1';
-        else
-            rst <= '1';
-            wait for 2.5 * clk_period;
-            rst <= '0';
-        end if;
+        wait for 3 * clk_period;
+        rst <= not rst after input_delay;
         wait until rising_edge(clk);
-        -- wait for clk_period;            -- optional
         reset_done <= True;
         wait;
     end process;
