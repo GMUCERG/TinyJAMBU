@@ -19,11 +19,10 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-library work;
 use work.design_pkg.all;
 use work.NIST_LWAPI_pkg.all;
 
-entity tinyjambu_datapath is
+entity tinyjambu_datapath_ti is
     port (
         clk                 : in std_logic;
         reset               : in std_logic;
@@ -50,9 +49,9 @@ entity tinyjambu_datapath is
         bdo_b               : out std_logic_vector (CCW - 1 downto 0);
         bdo_c               : out std_logic_vector (CCW - 1 downto 0)
     );
-end entity tinyjambu_datapath;
+end entity;
 
-architecture dataflow of tinyjambu_datapath is
+architecture dataflow of tinyjambu_datapath_ti is
 
 -- Keep architecture ---------------------------------------------------------
 attribute keep_hierarchy : string;

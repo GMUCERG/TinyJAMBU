@@ -43,10 +43,10 @@ entity LWC_TB IS
         G_RDI_STALLS       : natural  := 3;                        --! Number of cycles to stall rdi_valid
         G_RANDOM_STALL     : boolean  := FALSE;                    --! Stall for a random number of cycles in the range [0..G_xx_STALLS], when G_TEST_MODE is 1, 2, or 3
         G_CLK_PERIOD_PS    : positive := 10_000;                   --! Simulation clock period in picoseconds
-        G_FNAME_PDI        : string   := "../KAT/v1/pdi.txt";      --! Path to the input file containing cryptotvgen PDI testvector data
-        G_FNAME_SDI        : string   := "../KAT/v1/sdi.txt";      --! Path to the input file containing cryptotvgen SDI testvector data
-        G_FNAME_DO         : string   := "../KAT/v1/do.txt";       --! Path to the input file containing cryptotvgen DO testvector data
-        G_FNAME_RDI        : string   := "../KAT/v1/rdi.txt";      --! Path to the input file containing random data
+        G_FNAME_PDI        : string   := "KAT/pdi.txt";      --! Path to the input file containing cryptotvgen PDI testvector data
+        G_FNAME_SDI        : string   := "KAT/sdi.txt";      --! Path to the input file containing cryptotvgen SDI testvector data
+        G_FNAME_DO         : string   := "KAT/do.txt";       --! Path to the input file containing cryptotvgen DO testvector data
+        G_FNAME_RDI        : string   := "KAT/rdi.txt";      --! Path to the input file containing random data
         G_PRNG_RDI         : boolean  := TRUE;                     --! Use testbench's internal PRNG to generate RDI input instead of the file `G_FNAME_RDI`
         G_RANDOM_SEED      : positive := 1;                        --! Internal PRNG seed, must be positive
         G_FNAME_LOG        : string   := "log.txt";                --! Path to the generated log file
@@ -277,19 +277,12 @@ begin
         " -- Random Seed:   " & integer'image(G_RANDOM_SEED) & LF &
         CR severity note;
 
+        rst <= '0' when ASYNC_RSTN else '1' after input_delay;
         seed(G_RANDOM_SEED);
         wait for G_PRERESET_WAIT_PS * ps;
-        if ASYNC_RSTN then
-            rst <= '0';
-            wait for 2 * clk_period;
-            rst <= '1';
-        else
-            rst <= '1';
-            wait for 2 * clk_period + input_delay;
-            rst <= '0';
-        end if;
+        wait for 3 * clk_period;
+        rst <= not rst after input_delay;
         wait until rising_edge(clk);
-        wait for clk_period;            -- optional
         reset_done <= True;
         wait;
     end process;

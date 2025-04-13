@@ -22,7 +22,7 @@ library work;
 use work.design_pkg.all;
 use work.NIST_LWAPI_pkg.all;
 
-entity tinyjambu_control is
+entity tinyjambu_control_ti is
     port (
         clk             : in std_logic;
         reset           : in std_logic;
@@ -73,9 +73,9 @@ entity tinyjambu_control is
         msg_auth        : out std_logic
 
     );
-end entity tinyjambu_control;
+end entity;
 
-architecture behavioral of tinyjambu_control is
+architecture behavioral of tinyjambu_control_ti is
 
 -- Keep architecture ---------------------------------------------------------
 attribute keep_hierarchy : string;
